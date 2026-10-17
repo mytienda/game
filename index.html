@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Perro 3D - Caza de Huesos</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',Arial,sans-serif;touch-action:none;-webkit-user-select:none;user-select:none}
+#c{display:block;width:100vw;height:100vh}
+#hud{position:absolute;top:15px;left:15px;color:#fff;background:rgba(0,0,0,.55);padding:12px 18px;border-radius:12px;font-size:17px;line-height:1.6;min-width:230px;z-index:10;pointer-events:none}
+#hud b{color:#ffd76a}
+#barra{height:6px;background:rgba(255,255,255,.2);border-radius:3px;margin-top:6px;overflow:hidden}
+#barraFill{height:100%;width:100%;background:#f5b342}
+#barraFill.peligro{background:#e53935}
+#inv{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:10;pointer-events:none}
+.slot{width:62px;height:62px;border-radius:10px;background:rgba(0,0,0,.55);border:2px solid rgba(255,255,255,.3);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:26px;position:relative}
+.slot small{font-size:11px;position:absolute;bottom:3px}
+.slot.activo{border-color:#ffd76a;box-shadow:0 0 12px #ffd76a}
+.slot.vacio{opacity:.35}
+#flash,#oscuro{position:absolute;inset:0;pointer-events:none;opacity:0;z-index:5}
+#flash{background:#d00}
+#oscuro{transition:opacity .3s;background:radial-gradient(circle,transparent 35%,rgba(60,35,10,.85) 100%)}
+#mapa{position:absolute;right:15px;bottom:15px;border-radius:50%;background:rgba(0,0,0,.45);border:2px solid rgba(255,255,255,.3);z-index:10;pointer-events:none}
+#aviso{position:absolute;top:22%;left:50%;transform:translateX(-50%);color:#fff;font-size:32px;font-weight:800;text-shadow:0 3px 8px #000;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:10}
+#pantalla{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:5000}
+#caja{color:#fff;background:rgba(15,15,20,.95);padding:28px 36px;border-radius:18px;text-align:center;max-width:92vw;width:520px;font-size:17px;line-height:1.6;max-height:92vh;overflow:auto}
+#caja h1{margin:0 0 10px;font-size:30px;color:#ffd76a}
+#caja button{margin:12px 6px 0;padding:12px 26px;font-size:18px;font-weight:700;border:none;border-radius:10px;background:#f5b342;cursor:pointer}
+#caja button#toggleMovil{background:#555;color:#fff;font-size:15px}
+
+/* ===== CONTROLES TÁCTILES ===== */
+#tc{display:none}
+body.movil #tc{display:block}
+#tc-look{position:fixed;top:0;right:0;width:55%;height:100%;z-index:100}
+#tc-joy{position:fixed;left:25px;bottom:25px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.18);border:3px solid rgba(255,255,255,.5);z-index:200}
+#tc-knob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;background:rgba(255,255,255,.75);pointer-events:none}
+.tb{position:fixed;z-index:200;width:66px;height:66px;border-radius:50%;background:rgba(0,0,0,.45);border:3px solid rgba(255,255,255,.6);color:#fff;font-size:28px;display:flex;align-items:center;justify-content:center}
+.tb.on{background:rgba(255,200,0,.7)}
+#tb-jump{right:25px;bottom:30px;width:84px;height:84px;font-size:34px}
+#tb-bark{right:125px;bottom:25px}
+#tb-run{right:30px;bottom:130px}
+#tb-hide{right:120px;bottom:110px}
+#tb-pause{right:15px;top:15px;width:50px;height:50px;font-size:22px}
+body.movil #hud{font-size:13px;padding:6px 10px;min-width:0;line-height:1.4}
+body.movil #mapa{width:100px;height:100px;top:75px;right:12px;bottom:auto}
+body.movil #inv{bottom:10px}
+body.movil .slot{width:50px;height:50px;font-size:20px}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="flash"></div>
+<div id="oscuro"></div>
+<div id="aviso"></div>
+<canvas id="mapa" width="160" height="160"></canvas>
+
+<div id="hud">
+  🦴 Huesos: <b id="score">0</b><br>
+  💎 Combo: <b id="combo">x1</b><br>
+  ❤️ Vidas: <b id="vidas">3</b><br>
+  🐕 Ladrido: <b id="ladrido">listo</b><br>
+  ⏱️ Tiempo: <b id="time">120</b>s
+  <div id="barra"><div id="barraFill"></div></div>
+</div>
+
+<div id="inv"><div class="slot" id="slot1">📦<small id="slotTxt">Q · x1</small></div></div>
+
+<div id="tc">
+  <div id="tc-look"></div>
+  <div id="tc-joy"><div id="tc-knob"></div></div>
+  <div class="tb" id="tb-jump">⬆️</div>
+  <div class="tb" id="tb-bark">🐕</div>
+  <div class="tb" id="tb-run">🏃</div>
+  <div class="tb" id="tb-hide">📦</div>
+  <div class="tb" id="tb-pause">⏸️</div>
+</div>
+
+<div id="pantalla">
+  <div id="caja">
+    <h1 id="titulo">🐶 Perro 3D</h1>
+    <div id="texto">
+      Recoge huesos, escala estructuras y escapa de los lobos.<br><br>
+      <b>PC:</b> WASD mover · Ratón cámara · Shift correr · Espacio saltar · Clic/E ladrar · Q caja · Esc pausa<br><br>
+      <b>Celular:</b> joystick izquierdo para mover · arrastra a la derecha para girar la cámara · botones para saltar, ladrar, correr y esconderte
+    </div>
+    <button id="boton">Jugar</button><br>
+    <button id="toggleMovil">🎮 Mostrar/ocultar controles táctiles</button>
+  </div>
+</div>
+
+<script>
+// ================= DETECCIÓN MÓVIL =================
+var ES_MOVIL = ('ontouchstart' in window) || navigator.maxTouchPoints > 0 ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+function setMovil(on) { ES_MOVIL = on; document.body.classList.toggle('movil', on); }
+setMovil(ES_MOVIL);
+// Respaldo: cualquier toque real activa los controles
+window.addEventListener('touchstart', function () { if (!ES_MOVIL) setMovil(true); }, { passive: true });
+document.getElementById('toggleMovil').onclick = function () { setMovil(!ES_MOVIL); };
+
+// ================= MOTOR 3D =================
+var cv = document.getElementById('c');
+var gl = cv.getContext('webgl', { antialias: true });
+if (!gl) alert('Tu navegador no soporta WebGL.');
+
+var VS = 'attribute vec3 aPos;attribute vec3 aNor;uniform mat4 uVP;uniform mat4 uM;uniform float uRy;varying vec3 vN;varying vec3 vW;' +
+  'void main(){vec4 w=uM*vec4(aPos,1.0);vW=w.xyz;float c=cos(uRy);float s=sin(uRy);vN=vec3(c*aNor.x+s*aNor.z,aNor.y,-s*aNor.x+c*aNor.z);gl_Position=uVP*w;}';
+var FS = 'precision mediump float;uniform vec3 uColor;uniform vec3 uEye;uniform vec3 uFog;uniform float uEm;varying vec3 vN;varying vec3 vW;' +
+  'void main(){vec3 L=normalize(vec3(0.45,1.0,0.3));float d=max(dot(normalize(vN),L),0.0);vec3 col=uColor*(0.42+0.68*d);col=mix(col,uColor*1.2,uEm);' +
+  'float f=clamp((length(vW-uEye)-35.0)/70.0,0.0,1.0);gl_FragColor=vec4(mix(col,uFog,f),1.0);}';
+function compilar(tipo, src) { var s = gl.createShader(tipo); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+var prog = gl.createProgram();
+gl.attachShader(prog, compilar(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, compilar(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog); gl.useProgram(prog);
+
+var P = [], N = [];
+[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]].forEach(function (n) {
+  var u = n[1] !== 0 ? [1,0,0] : [0,1,0];
+  var v = [n[1]*u[2]-n[2]*u[1], n[2]*u[0]-n[0]*u[2], n[0]*u[1]-n[1]*u[0]];
+  function q(a, b) { return [0.5*(n[0]+a*u[0]+b*v[0]), 0.5*(n[1]+a*u[1]+b*v[1]), 0.5*(n[2]+a*u[2]+b*v[2])]; }
+  [q(-1,-1), q(1,-1), q(1,1), q(-1,-1), q(1,1), q(-1,1)].forEach(function (p) { P.push(p[0], p[1], p[2]); N.push(n[0], n[1], n[2]); });
+});
+function buffer(datos, nombre) { var b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(datos), gl.STATIC_DRAW);
+  var l = gl.getAttribLocation(prog, nombre); gl.enableVertexAttribArray(l); gl.vertexAttribPointer(l, 3, gl.FLOAT, false, 0, 0); }
+buffer(P, 'aPos'); buffer(N, 'aNor');
+
+var U = {};
+['uVP','uM','uRy','uColor','uEye','uFog','uEm'].forEach(function (n) { U[n] = gl.getUniformLocation(prog, n); });
+gl.enable(gl.DEPTH_TEST);
+var FOG = [0.53, 0.81, 0.92];
+gl.clearColor(FOG[0], FOG[1], FOG[2], 1); gl.uniform3fv(U.uFog, FOG);
+
+function hex(h) { return [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255]; }
+var C = { pasto: hex(0x4caf50), parche: hex(0x3e9142), tronco: hex(0x8b5a2b), hoja: hex(0x2e7d32), hoja2: hex(0x388e3c), roca: hex(0x7d7d7d),
+  hueso: hex(0xfff3b0), lobo: hex(0x6d6d75), loboOsc: hex(0x3a3a40), ojo: hex(0xff2020), aturd: hex(0x64b5f6), cerca: hex(0xa1887f),
+  perro: hex(0xc68642), perroOsc: hex(0x7a4a22), nariz: hex(0x222222), collar: hex(0xe53935),
+  carton: hex(0xc9a26b), cartonOsc: hex(0x9c7a48), cinta: hex(0xe8d9b0),
+  madera: hex(0xa0703c), madera2: hex(0x8d5e30), piedra: hex(0x9e9e9e), piedra2: hex(0x8a8a8a) };
+
+var M = new Float32Array(16);
+function box(x, y, z, sx, sy, sz, ry, col, em) {
+  var c = Math.cos(ry), s = Math.sin(ry);
+  M[0]=c*sx; M[1]=0; M[2]=-s*sx; M[3]=0; M[4]=0; M[5]=sy; M[6]=0; M[7]=0;
+  M[8]=s*sz; M[9]=0; M[10]=c*sz; M[11]=0; M[12]=x; M[13]=y; M[14]=z; M[15]=1;
+  gl.uniformMatrix4fv(U.uM, false, M); gl.uniform1f(U.uRy, ry); gl.uniform3fv(U.uColor, col); gl.uniform1f(U.uEm, em || 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 36);
+}
+function part(b, lx, ly, lz, sx, sy, sz, col, em) { var c = Math.cos(b.ry), s = Math.sin(b.ry);
+  box(b.x + c*lx + s*lz, b.y + ly, b.z - s*lx + c*lz, sx, sy, sz, b.ry, col, em); }
+function perspectiva(fov, a, n, f) { var t = 1 / Math.tan(fov / 2); return [t/a,0,0,0, 0,t,0,0, 0,0,(f+n)/(n-f),-1, 0,0,2*f*n/(n-f),0]; }
+function mirar(e, c) {
+  var fx=c[0]-e[0], fy=c[1]-e[1], fz=c[2]-e[2], l = Math.hypot(fx, fy, fz); fx/=l; fy/=l; fz/=l;
+  var sx=-fz, sy=0, sz=fx; l = Math.hypot(sx, sz) || 1; sx/=l; sz/=l;
+  var ux=sy*fz-sz*fy, uy=sz*fx-sx*fz, uz=sx*fy-sy*fx;
+  return [sx,ux,-fx,0, sy,uy,-fy,0, sz,uz,-fz,0, -(sx*e[0]+sy*e[1]+sz*e[2]), -(ux*e[0]+uy*e[1]+uz*e[2]), fx*e[0]+fy*e[1]+fz*e[2], 1];
+}
+function mul(a, b) { var r = new Float32Array(16);
+  for (var c = 0; c < 4; c++) for (var i = 0; i < 4; i++) { var s = 0; for (var k = 0; k < 4; k++) s += a[k*4+i] * b[c*4+k]; r[c*4+i] = s; }
+  return r; }
+var proj;
+function resize() { var d = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = innerWidth * d; cv.height = innerHeight * d; gl.viewport(0, 0, cv.width, cv.height);
+  proj = perspectiva(70 * Math.PI / 180, innerWidth / innerHeight, 0.1, 300); }
+resize(); addEventListener('resize', resize);
+
+// ================= MUNDO =================
+var LIM = 90, TAM = LIM * 2;
+var obst = [], arboles = [], rocas = [], parches = [], plats = [];
+function rnd(a) { return (Math.random() - .5) * a; }
+function enPlat(x, z, m) { for (var i = 0; i < plats.length; i++) { var p = plats[i];
+  if (Math.abs(x - p.x) < p.w / 2 + m && Math.abs(z - p.z) < p.d / 2 + m) return true; } return false; }
+function libre(x, z, m) { for (var i = 0; i < obst.length; i++) if (Math.hypot(obst[i].x - x, obst[i].z - z) < obst[i].r + m) return false; return !enPlat(x, z, m); }
+function addPlat(x, z, w, d, h, col) { plats.push({ x: x, z: z, w: w, d: d, h: h, col: col }); }
+
+for (var i = 0; i < 16; i++) {
+  var ox = rnd(TAM - 30), oz = rnd(TAM - 30);
+  if (Math.hypot(ox, oz) < 12 || enPlat(ox, oz, 12)) continue;
+  var dir = Math.floor(Math.random() * 4), dx = [1,-1,0,0][dir], dz = [0,0,1,-1][dir], piedra = Math.random() < .5;
+  for (var s = 0; s < 4; s++) addPlat(ox + dx*s*2.4, oz + dz*s*2.4, 2.4, 2.4, 1 + s, piedra ? (s % 2 ? C.piedra : C.piedra2) : (s % 2 ? C.madera : C.madera2));
+  addPlat(ox + dx*4*2.4 + dx*1.6, oz + dz*4*2.4 + dz*1.6, 5, 5, 4.6, piedra ? C.piedra : C.madera);
+}
+for (var i = 0; i < 55; i++) {
+  var x = rnd(TAM - 10), z = rnd(TAM - 10), w = 2 + Math.random() * 4, d = 2 + Math.random() * 4;
+  if (Math.hypot(x, z) < 8 || enPlat(x, z, 4)) continue;
+  var h = 1 + Math.random() * 0.4;
+  addPlat(x, z, w, d, h, Math.random() < .5 ? C.madera : C.piedra);
+  if (Math.random() < .4) addPlat(x + rnd(1), z + rnd(1), w * 0.6, d * 0.6, h + 1.1, Math.random() < .5 ? C.madera2 : C.piedra2);
+}
+for (var i = 0; i < 160; i++) { var x = rnd(TAM - 6), z = rnd(TAM - 6);
+  if (Math.hypot(x, z) < 6 || !libre(x, z, 2)) continue;
+  arboles.push({ x: x, z: z, ry: Math.random() * 3, h: 0.8 + Math.random() * 0.6, col: Math.random() < .5 ? C.hoja : C.hoja2 });
+  obst.push({ x: x, z: z, r: 0.6 }); }
+for (var i = 0; i < 70; i++) { var x = rnd(TAM - 6), z = rnd(TAM - 6), s = 0.7 + Math.random() * 1.1;
+  if (Math.hypot(x, z) < 6 || !libre(x, z, 1.5)) continue;
+  rocas.push({ x: x, z: z, s: s, ry: Math.random() * 3 }); obst.push({ x: x, z: z, r: s * 0.65 }); }
+for (var i = 0; i < 200; i++) parches.push({ x: rnd(TAM), z: rnd(TAM), sx: 2 + Math.random() * 5, sz: 2 + Math.random() * 5, ry: Math.random() * 3 });
+
+// ================= ESTADO =================
+var J = { x: 0, z: 0, y: 0, vy: 0 };
+var yaw = 0, pitch = 0.35, bob = 0, enSuelo = true, perroRy = Math.PI;
+var score, combo, comboT, tiempo, vidas, inv, ladridoCd, tJuego, proxEnemigo, cajas, escondido, escondT;
+var huesos = [], enemigos = [], cajasMapa = [];
+var estado = 'inicio', pausado = false, flash = 0, TMAX = 120, TESC = 6;
+var joyX = 0, joyY = 0, correrT = false, saltarT = false;   // entradas táctiles
+
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function posLibre(minD, permitirPlat) {
+  if (permitirPlat && plats.length && Math.random() < 0.35) { var p = plats[Math.floor(Math.random() * plats.length)]; return { x: p.x, z: p.z, y: p.h }; }
+  for (var i = 0; i < 100; i++) { var x = rnd(TAM - 8), z = rnd(TAM - 8);
+    if (Math.hypot(x - J.x, z - J.z) >= minD && libre(x, z, 1.2)) return { x: x, z: z, y: 0 }; }
+  return { x: rnd(TAM - 8), z: rnd(TAM - 8), y: 0 };
+}
+function nuevoHueso() { var p = posLibre(6, true); return { x: p.x, z: p.z, base: p.y, y: p.y + 0.7, rot: Math.random() * 6, fase: Math.random() * 6, esc: 0 }; }
+function nuevaCaja() { var p = posLibre(12, true); return { x: p.x, z: p.z, base: p.y, rot: Math.random() * 6 }; }
+function nuevoEnemigo() { var p = posLibre(30, false); return { x: p.x, z: p.z, ry: 0, fase: Math.random() * 6, aturd: 0, confuso: 0, wx: p.x, wz: p.z }; }
+function reset() {
+  J.x = 0; J.z = 0; J.y = 0; J.vy = 0; yaw = 0; pitch = 0.35; enSuelo = true; perroRy = Math.PI;
+  score = 0; combo = 1; comboT = 0; tiempo = TMAX; vidas = 3; inv = 0; ladridoCd = 0; tJuego = 0; proxEnemigo = 15;
+  cajas = 1; escondido = false; escondT = 0; huesos = []; enemigos = []; cajasMapa = [];
+  for (var i = 0; i < 14; i++) huesos.push(nuevoHueso());
+  for (var i = 0; i < 4; i++) enemigos.push(nuevoEnemigo());
+  for (var i = 0; i < 4; i++) cajasMapa.push(nuevaCaja());
+  hud();
+}
+
+// ================= UI =================
+var el = function (id) { return document.getElementById(id); };
+var pantalla = el('pantalla');
+function mostrar(t, txt, btn) { el('titulo').textContent = t; el('texto').innerHTML = txt; el('boton').textContent = btn; pantalla.style.display = 'flex'; }
+function ocultar() { pantalla.style.display = 'none'; }
+var avisoT;
+function aviso(t) { var a = el('aviso'); a.textContent = t; a.style.opacity = 1; clearTimeout(avisoT); avisoT = setTimeout(function () { a.style.opacity = 0; }, 1000); }
+function hud() {
+  el('score').textContent = score; el('combo').textContent = 'x' + combo;
+  el('vidas').textContent = vidas > 0 ? '❤️'.repeat(vidas) : '0';
+  el('ladrido').textContent = ladridoCd > 0 ? ladridoCd.toFixed(1) + 's' : 'listo';
+  el('time').textContent = Math.ceil(tiempo);
+  el('barraFill').style.width = clamp(tiempo / TMAX, 0, 1) * 100 + '%';
+  el('barraFill').className = tiempo <= 10 ? 'peligro' : '';
+  el('slot1').className = 'slot' + (escondido ? ' activo' : '') + (cajas <= 0 && !escondido ? ' vacio' : '');
+  el('slotTxt').textContent = escondido ? escondT.toFixed(1) + 's' : (ES_MOVIL ? 'x' : 'Q · x') + cajas;
+  el('oscuro').style.opacity = escondido ? 1 : 0;
+}
+
+// ================= SONIDO =================
+var AC = null;
+function audioInit() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (AC && AC.state === 'suspended') AC.resume(); }
+function sonido(f1, f2, dur, tipo, vol) {
+  if (!AC) return;
+  var o = AC.createOscillator(), g = AC.createGain(), t = AC.currentTime;
+  o.type = tipo; o.frequency.setValueAtTime(f1, t); o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t + dur);
+}
+
+// ================= CONTROLES PC =================
+var tec = {};
+function bloquear() { if (ES_MOVIL) return; try { var r = cv.requestPointerLock(); if (r && r.catch) r.catch(function () {}); } catch (e) {} }
+function pausar() { if (estado !== 'jugando' || pausado) return; pausado = true; mostrar('⏸️ Pausa', 'El juego está en pausa.', 'Continuar'); }
+addEventListener('keydown', function (e) {
+  tec[e.code] = true;
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].indexOf(e.code) >= 0) e.preventDefault();
+  if (estado !== 'jugando' || pausado || e.repeat) return;
+  if (e.code === 'KeyE') ladrar();
+  if (e.code === 'KeyQ') usarCaja();
+  if (e.code === 'Escape') pausar();
+});
+addEventListener('keyup', function (e) { tec[e.code] = false; });
+addEventListener('mousemove', function (e) {
+  if (document.pointerLockElement !== cv || pausado || estado !== 'jugando') return;
+  yaw += e.movementX * 0.0025; pitch = clamp(pitch + e.movementY * 0.0025, -0.1, 1.2);
+});
+cv.addEventListener('mousedown', function () {
+  if (estado !== 'jugando' || pausado || ES_MOVIL) return;
+  if (document.pointerLockElement === cv) ladrar(); else bloquear();
+});
+document.addEventListener('pointerlockchange', function () {
+  if (!ES_MOVIL && document.pointerLockElement !== cv) pausar();
+});
+el('boton').onclick = function () {
+  audioInit();
+  if (estado === 'jugando' && pausado) { pausado = false; ocultar(); }
+  else { reset(); estado = 'jugando'; pausado = false; ocultar(); }
+  bloquear();
+};
+
+// ================= CONTROLES TÁCTILES (directos, sin simular teclas) =================
+(function () {
+  function onTouch(elem, start, move, end) {
+    elem.addEventListener('touchstart', function (e) { e.preventDefault(); start && start(e); }, { passive: false });
+    elem.addEventListener('touchmove', function (e) { e.preventDefault(); move && move(e); }, { passive: false });
+    elem.addEventListener('touchend', function (e) { e.preventDefault(); end && end(e); }, { passive: false });
+    elem.addEventListener('touchcancel', function (e) { end && end(e); }, { passive: false });
+  }
+  function jugando() { return estado === 'jugando' && !pausado; }
+
+  // Joystick
+  var joy = el('tc-joy'), knob = el('tc-knob'), R = 55, joyId = null;
+  function upd(t) {
+    var r = joy.getBoundingClientRect();
+    var dx = t.clientX - (r.left + r.width / 2), dy = t.clientY - (r.top + r.height / 2), len = Math.hypot(dx, dy);
+    if (len > R) { dx = dx / len * R; dy = dy / len * R; }
+    knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    joyX = dx / R; joyY = dy / R;
+    if (Math.hypot(joyX, joyY) < 0.2) { joyX = 0; joyY = 0; }
+  }
+  function buscar(e, id) { for (var i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === id) return e.changedTouches[i]; return null; }
+  onTouch(joy,
+    function (e) { var t = e.changedTouches[0]; joyId = t.identifier; upd(t); },
+    function (e) { var t = buscar(e, joyId); if (t) upd(t); },
+    function (e) { if (buscar(e, joyId)) { joyId = null; joyX = 0; joyY = 0; knob.style.transform = ''; } });
+
+  // Cámara
+  var look = el('tc-look'), lookId = null, lx = 0, ly = 0;
+  onTouch(look,
+    function (e) { var t = e.changedTouches[0]; lookId = t.identifier; lx = t.clientX; ly = t.clientY; },
+    function (e) { var t = buscar(e, lookId); if (!t || !jugando()) return;
+      yaw += (t.clientX - lx) * 0.006; pitch = clamp(pitch + (t.clientY - ly) * 0.006, -0.1, 1.2);
+      lx = t.clientX; ly = t.clientY; },
+    function (e) { if (buscar(e, lookId)) lookId = null; });
+
+  // Botones
+  var bJump = el('tb-jump');
+  onTouch(bJump, function () { saltarT = true; bJump.classList.add('on'); }, null, function () { saltarT = false; bJump.classList.remove('on'); });
+  var bRun = el('tb-run');
+  onTouch(bRun, function () { correrT = !correrT; bRun.classList.toggle('on', correrT); });
+  onTouch(el('tb-bark'), function () { if (jugando()) ladrar(); });
+  onTouch(el('tb-hide'), function () { if (jugando()) usarCaja(); });
+  onTouch(el('tb-pause'), function () { pausar(); });
+})();
+
+// ================= ACCIONES =================
+function ladrar() {
+  if (ladridoCd > 0 || escondido) return;
+  ladridoCd = 4;
+  sonido(480, 200, 0.16, 'sawtooth', 0.25);
+  setTimeout(function () { sonido(520, 220, 0.16, 'sawtooth', 0.25); }, 180);
+  aviso('¡GUAU!');
+  var fx = Math.sin(perroRy), fz = Math.cos(perroRy);
+  enemigos.forEach(function (e) {
+    var dx = e.x - J.x, dz = e.z - J.z, d = Math.hypot(dx, dz) || 1;
+    if (d < 9 && (dx * fx + dz * fz) / d > 0.4) { e.aturd = 3; e.x += dx / d * 3; e.z += dz / d * 3; }
+  });
+}
+function usarCaja() {
+  if (escondido) { salirCaja(); return; }
+  if (cajas <= 0) { aviso('No tienes cajas 📦'); return; }
+  if (!enSuelo) return;
+  cajas--; escondido = true; escondT = TESC;
+  sonido(300, 150, 0.2, 'triangle', 0.2); aviso('📦 ¡Escondido!');
+  enemigos.forEach(function (e) { e.wx = clamp(e.x + rnd(30), -LIM, LIM); e.wz = clamp(e.z + rnd(30), -LIM, LIM); });
+  hud();
+}
+function salirCaja() {
+  escondido = false; escondT = 0;
+  enemigos.forEach(function (e) { e.confuso = 1.5; });
+  sonido(150, 300, 0.2, 'triangle', 0.2); aviso('¡Fuera de la caja!');
+}
+
+function empujar(o2, rad) { for (var i = 0; i < obst.length; i++) {
+  var o = obst[i], dx = o2.x - o.x, dz = o2.z - o.z, d = Math.hypot(dx, dz), m = o.r + rad;
+  if (d < m && d > 1e-4) { o2.x = o.x + dx / d * m; o2.z = o.z + dz / d * m; } } }
+function empujarPlats(o2, rad, y) { for (var i = 0; i < plats.length; i++) {
+  var p = plats[i]; if (y >= p.h - 0.35) continue;
+  var hx = p.w / 2 + rad, hz = p.d / 2 + rad, dx = o2.x - p.x, dz = o2.z - p.z;
+  if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
+    if (hx - Math.abs(dx) < hz - Math.abs(dz)) o2.x = p.x + (dx >= 0 ? hx : -hx); else o2.z = p.z + (dz >= 0 ? hz : -hz); } } }
+function alturaSuelo(x, z, y) { var s = 0; for (var i = 0; i < plats.length; i++) { var p = plats[i];
+  if (Math.abs(x - p.x) < p.w / 2 + 0.2 && Math.abs(z - p.z) < p.d / 2 + 0.2 && y >= p.h - 0.35) s = Math.max(s, p.h); } return s; }
+
+function fin(titulo) {
+  estado = 'fin'; var rec = 0;
+  try { rec = +localStorage.getItem('perro3d_record') || 0; if (score > rec) { rec = score; localStorage.setItem('perro3d_record', score); } } catch (e) { rec = Math.max(rec, score); }
+  if (document.exitPointerLock) document.exitPointerLock();
+  mostrar(titulo, 'Recogiste <b style="font-size:34px;color:#ffd76a">' + score + '</b> huesos 🦴<br>Sobreviviste ' + Math.floor(tJuego) + ' s<br>Récord: ' + rec, 'Jugar de nuevo');
+}
+
+// ================= LÓGICA =================
+var moviendo = false;
+function actualizar(dt, t) {
+  tJuego += dt; tiempo -= dt;
+  if (ladridoCd > 0) ladridoCd = Math.max(0, ladridoCd - dt);
+  if (inv > 0) inv -= dt;
+  if (comboT > 0) { comboT -= dt; if (comboT <= 0) combo = 1; }
+  if (escondido) { escondT -= dt; if (escondT <= 0) salirCaja(); }
+  if (tec.ArrowLeft) yaw -= 2.4 * dt;
+  if (tec.ArrowRight) yaw += 2.4 * dt;
+
+  var mf = 0, ms = 0;
+  if (!escondido) {
+    if (tec.KeyW || tec.ArrowUp) mf += 1;
+    if (tec.KeyS || tec.ArrowDown) mf -= 1;
+    if (tec.KeyD) ms += 1;
+    if (tec.KeyA) ms -= 1;
+    mf -= joyY; ms += joyX;            // joystick táctil
+  }
+  var fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
+  var vx = fx * mf + rx * ms, vz = fz * mf + rz * ms, l = Math.hypot(vx, vz);
+  var corre = tec.ShiftLeft || tec.ShiftRight || correrT, vel = corre ? 10 : 6;
+  moviendo = l > 0.01;
+  if (moviendo) {
+    var k = Math.min(l, 1);
+    J.x += vx / l * vel * k * dt; J.z += vz / l * vel * k * dt; bob += dt * (corre ? 14 : 10);
+    var dif = Math.atan2(vx, vz) - perroRy;
+    while (dif > Math.PI) dif -= 2 * Math.PI;
+    while (dif < -Math.PI) dif += 2 * Math.PI;
+    perroRy += dif * Math.min(1, dt * 12);
+  }
+  empujar(J, 0.4); empujarPlats(J, 0.4, J.y);
+  J.x = clamp(J.x, -LIM, LIM); J.z = clamp(J.z, -LIM, LIM);
+
+  var suelo = alturaSuelo(J.x, J.z, J.y);
+  if ((tec.Space || saltarT) && enSuelo && !escondido) { J.vy = 7.5; enSuelo = false; }
+  J.vy -= 20 * dt; J.y += J.vy * dt;
+  if (J.y <= suelo) { J.y = suelo; J.vy = 0; enSuelo = true; } else enSuelo = false;
+
+  for (var i = huesos.length - 1; i >= 0; i--) {
+    var h = huesos[i];
+    h.rot += dt * 2; h.esc = Math.min(1, h.esc + dt * 2);
+    h.y = h.base + 0.7 + Math.sin(t * 3 + h.fase) * 0.2;
+    if (!escondido && h.esc > 0.5 && Math.hypot(h.x - J.x, h.z - J.z) < 1.3 && Math.abs(J.y + 0.5 - h.y) < 1.3) {
+      score += combo; tiempo = Math.min(TMAX + 30, tiempo + 3);
+      combo = Math.min(5, combo + 1); comboT = 2.5;
+      sonido(660, 1320, 0.15, 'square', 0.12);
+      huesos.splice(i, 1); huesos.push(nuevoHueso());
+      if (combo >= 3) aviso('¡Combo x' + combo + '!');
+    }
+  }
+  for (var i = cajasMapa.length - 1; i >= 0; i--) {
+    var c = cajasMapa[i]; c.rot += dt * 1.5;
+    if (!escondido && cajas < 3 && Math.hypot(c.x - J.x, c.z - J.z) < 1.4 && Math.abs(J.y - c.base) < 1.2) {
+      cajas++; sonido(400, 800, 0.15, 'triangle', 0.15); aviso('📦 +1 caja');
+      cajasMapa.splice(i, 1); cajasMapa.push(nuevaCaja());
+    }
+  }
+
+  var velE = Math.min(5.4, 3 + tJuego * 0.02);
+  if (tJuego >= proxEnemigo && enemigos.length < 14) { enemigos.push(nuevoEnemigo()); proxEnemigo += 15; aviso('⚠️ ¡Llegó otro lobo!'); }
+  for (var i = 0; i < enemigos.length; i++) {
+    var e = enemigos[i]; e.fase += dt * 10;
+    var dx = J.x - e.x, dz = J.z - e.z, d = Math.hypot(dx, dz) || 0.001;
+    if (e.confuso > 0) e.confuso -= dt;
+    if (e.aturd > 0) e.aturd -= dt;
+    else if (escondido || e.confuso > 0) {
+      var wx = e.wx - e.x, wz = e.wz - e.z, wd = Math.hypot(wx, wz);
+      if (wd < 1.5) { e.wx = clamp(e.x + rnd(30), -LIM, LIM); e.wz = clamp(e.z + rnd(30), -LIM, LIM); }
+      else { e.x += wx / wd * velE * 0.45 * dt; e.z += wz / wd * velE * 0.45 * dt; e.ry = Math.atan2(wx, wz); }
+    } else { e.x += dx / d * velE * dt; e.z += dz / d * velE * dt; e.ry = Math.atan2(dx, dz); }
+    empujar(e, 0.6); empujarPlats(e, 0.6, 0);
+    e.x = clamp(e.x, -LIM, LIM); e.z = clamp(e.z, -LIM, LIM);
+    if (!escondido && d < 1.1 && J.y < 0.9 && inv <= 0 && e.aturd <= 0) {
+      vidas--; inv = 1.5; flash = 1; combo = 1;
+      sonido(220, 60, 0.35, 'sawtooth', 0.3);
+      e.aturd = 1.5; e.x -= dx / d * 4; e.z -= dz / d * 4;
+      if (vidas <= 0) { hud(); fin('🐺 ¡Los lobos te atraparon!'); return; }
+    }
+  }
+  for (var i = 0; i < enemigos.length; i++) for (var j = i + 1; j < enemigos.length; j++) {
+    var a = enemigos[i], b = enemigos[j], dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+    if (d < 1.4 && d > 1e-4) { var p = (1.4 - d) / 2 / d; a.x -= dx * p; a.z -= dz * p; b.x += dx * p; b.z += dz * p; }
+  }
+  if (tiempo <= 0) { tiempo = 0; hud(); fin('⏱️ ¡Se acabó el tiempo!'); return; }
+  hud();
+}
+
+// ================= DIBUJO =================
+function dibujarPerro(t) {
+  if (inv > 0 && Math.floor(t * 15) % 2 === 0) return;
+  var b = { x: J.x, y: J.y, z: J.z, ry: perroRy }, mov = moviendo && enSuelo;
+  var pa = mov ? Math.sin(bob) * 0.1 : 0;
+  b.y += mov ? Math.abs(Math.sin(bob)) * 0.04 : 0;
+  part(b, 0, 0.55, 0, 0.5, 0.42, 1.0, C.perro);
+  part(b, 0, 0.82, 0.62, 0.45, 0.42, 0.45, C.perro);
+  part(b, 0, 0.74, 0.92, 0.24, 0.2, 0.25, C.perroOsc);
+  part(b, 0, 0.8, 1.05, 0.1, 0.08, 0.05, C.nariz);
+  part(b, -0.12, 0.92, 0.85, 0.07, 0.07, 0.03, C.nariz);
+  part(b, 0.12, 0.92, 0.85, 0.07, 0.07, 0.03, C.nariz);
+  part(b, -0.25, 0.85, 0.58, 0.08, 0.3, 0.18, C.perroOsc);
+  part(b, 0.25, 0.85, 0.58, 0.08, 0.3, 0.18, C.perroOsc);
+  part(b, 0, 0.64, 0.42, 0.48, 0.1, 0.1, C.collar);
+  part(b, Math.sin(t * 14) * 0.15, 0.8, -0.58, 0.1, 0.1, 0.4, C.perro);
+  part(b, -0.17, 0.18 + pa, 0.35, 0.14, 0.36, 0.14, C.perroOsc);
+  part(b, 0.17, 0.18 - pa, 0.35, 0.14, 0.36, 0.14, C.perroOsc);
+  part(b, -0.17, 0.18 - pa, -0.35, 0.14, 0.36, 0.14, C.perroOsc);
+  part(b, 0.17, 0.18 + pa, -0.35, 0.14, 0.36, 0.14, C.perroOsc);
+}
+function dibujarCaja(x, y, z, ry, s) {
+  var b = { x: x, y: y, z: z, ry: ry };
+  part(b, 0, 0.5 * s, 0, 1.2 * s, 1.0 * s, 1.2 * s, C.carton);
+  part(b, 0, 1.0 * s, 0, 1.22 * s, 0.04 * s, 0.25 * s, C.cinta);
+  part(b, 0, 0.5 * s, 0.61 * s, 0.6 * s, 0.25 * s, 0.02 * s, C.cartonOsc);
+}
+function dibujar(t) {
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  var D = 6.5, cp = Math.cos(pitch), objY = J.y + 1.0, fx = Math.sin(yaw), fz = -Math.cos(yaw);
+  var eye = [J.x - fx * D * cp, Math.max(0.4, objY + Math.sin(pitch) * D), J.z - fz * D * cp];
+  gl.uniformMatrix4fv(U.uVP, false, mul(proj, mirar(eye, [J.x, objY, J.z])));
+  gl.uniform3fv(U.uEye, eye);
+
+  box(0, -0.05, 0, TAM + 40, 0.1, TAM + 40, 0, C.pasto);
+  parches.forEach(function (p) { box(p.x, 0.01, p.z, p.sx, 0.02, p.sz, p.ry, C.parche); });
+  var F = LIM + 1;
+  for (var k = -F; k <= F; k += 4) {
+    box(k, 0.6, F, 0.25, 1.2, 0.25, 0, C.cerca); box(k, 0.6, -F, 0.25, 1.2, 0.25, 0, C.cerca);
+    box(F, 0.6, k, 0.25, 1.2, 0.25, 0, C.cerca); box(-F, 0.6, k, 0.25, 1.2, 0.25, 0, C.cerca);
+  }
+  box(0, 0.85, F, 2 * F, 0.12, 0.12, 0, C.cerca); box(0, 0.85, -F, 2 * F, 0.12, 0.12, 0, C.cerca);
+  box(F, 0.85, 0, 0.12, 0.12, 2 * F, 0, C.cerca); box(-F, 0.85, 0, 0.12, 0.12, 2 * F, 0, C.cerca);
+  plats.forEach(function (p) { box(p.x, p.h / 2, p.z, p.w, p.h, p.d, 0, p.col); box(p.x, p.h + 0.02, p.z, p.w * 0.92, 0.04, p.d * 0.92, 0, C.parche); });
+  arboles.forEach(function (a) {
+    box(a.x, a.h, a.z, 0.5, 2 * a.h, 0.5, 0, C.tronco);
+    box(a.x, 2 * a.h + 0.5, a.z, 2.2, 1.2, 2.2, a.ry, a.col);
+    box(a.x, 2 * a.h + 1.4, a.z, 1.5, 0.9, 1.5, a.ry + 0.5, a.col);
+    box(a.x, 2 * a.h + 2.1, a.z, 0.8, 0.7, 0.8, a.ry + 1, a.col);
+  });
+  rocas.forEach(function (r) { box(r.x, r.s * 0.4, r.z, r.s, r.s * 0.8, r.s * 0.9, r.ry, C.roca); });
+  huesos.forEach(function (h) {
+    var s = h.esc, b = { x: h.x, y: h.y, z: h.z, ry: h.rot };
+    part(b, 0, 0, 0, 0.9 * s, 0.16 * s, 0.16 * s, C.hueso, 0.6);
+    [[-0.45, -0.1], [-0.45, 0.1], [0.45, -0.1], [0.45, 0.1]].forEach(function (q) { part(b, q[0] * s, q[1] * s, 0, 0.24 * s, 0.24 * s, 0.24 * s, C.hueso, 0.6); });
+  });
+  cajasMapa.forEach(function (c) { dibujarCaja(c.x, c.base + 0.2 + Math.sin(t * 2 + c.rot) * 0.1, c.z, c.rot, 0.55); });
+  if (escondido) dibujarCaja(J.x, J.y, J.z, perroRy, 1 + Math.sin(t * 6) * 0.01); else dibujarPerro(t);
+  enemigos.forEach(function (e) {
+    var col = e.aturd > 0 ? C.aturd : C.lobo, osc = e.aturd > 0 ? C.aturd : C.loboOsc;
+    var b = { x: e.x, y: Math.abs(Math.sin(e.fase)) * 0.05, z: e.z, ry: e.ry }, pa = Math.sin(e.fase) * 0.08;
+    part(b, 0, 0.7, 0, 0.7, 0.55, 1.4, col);
+    part(b, 0, 1.0, 0.85, 0.55, 0.5, 0.55, col);
+    part(b, 0, 0.88, 1.22, 0.3, 0.24, 0.35, osc);
+    part(b, -0.15, 1.1, 1.13, 0.1, 0.1, 0.04, C.ojo, 1);
+    part(b, 0.15, 1.1, 1.13, 0.1, 0.1, 0.04, C.ojo, 1);
+    part(b, -0.17, 1.35, 0.8, 0.12, 0.25, 0.1, osc);
+    part(b, 0.17, 1.35, 0.8, 0.12, 0.25, 0.1, osc);
+    part(b, 0, 0.85, -0.9, 0.14, 0.14, 0.55, col);
+    part(b, -0.25, 0.22 + pa, 0.5, 0.18, 0.44, 0.18, osc);
+    part(b, 0.25, 0.22 - pa, 0.5, 0.18, 0.44, 0.18, osc);
+    part(b, -0.25, 0.22 - pa, -0.5, 0.18, 0.44, 0.18, osc);
+    part(b, 0.25, 0.22 + pa, -0.5, 0.18, 0.44, 0.18, osc);
+    if ((escondido || e.confuso > 0) && e.aturd <= 0) part(b, 0, 1.75, 0.85, 0.12, 0.3, 0.12, C.hueso, 1);
+  });
+}
+
+// Minimapa
+var mc = el('mapa'), mx = mc.getContext('2d'), MR = 80, ESC = 1.1;
+function dibujarMapa() {
+  mx.clearRect(0, 0, 160, 160);
+  var fx = Math.sin(yaw), fz = -Math.cos(yaw), rx = Math.cos(yaw), rz = Math.sin(yaw);
+  function pt(x, z, col, r, borde) {
+    var dx = x - J.x, dz = z - J.z, sx = (dx * rx + dz * rz) * ESC, sy = -(dx * fx + dz * fz) * ESC, d = Math.hypot(sx, sy);
+    if (d > MR - 6) { if (!borde) return; sx *= (MR - 6) / d; sy *= (MR - 6) / d; }
+    mx.fillStyle = col; mx.beginPath(); mx.arc(MR + sx, MR + sy, r, 0, 6.283); mx.fill();
+  }
+  plats.forEach(function (p) { pt(p.x, p.z, 'rgba(200,200,200,.45)', 2.5, false); });
+  huesos.forEach(function (h) { pt(h.x, h.z, '#ffe066', 3, true); });
+  cajasMapa.forEach(function (c) { pt(c.x, c.z, '#c9a26b', 3.5, true); });
+  enemigos.forEach(function (e) { pt(e.x, e.z, e.aturd > 0 ? '#64b5f6' : (escondido || e.confuso > 0 ? '#ff9e9e' : '#ff3b3b'), 4, true); });
+  mx.fillStyle = '#fff'; mx.beginPath(); mx.moveTo(MR, MR - 7); mx.lineTo(MR - 5, MR + 5); mx.lineTo(MR + 5, MR + 5); mx.fill();
+}
+
+// ================= BUCLE =================
+var ultimo = performance.now();
+function frame(ahora) {
+  requestAnimationFrame(frame);
+  var dt = Math.min((ahora - ultimo) / 1000, 0.05); ultimo = ahora;
+  if (estado === 'jugando' && !pausado) actualizar(dt, ahora / 1000);
+  flash = Math.max(0, flash - dt * 2);
+  el('flash').style.opacity = flash * 0.5;
+  dibujar(ahora / 1000);
+  dibujarMapa();
+}
+reset();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
